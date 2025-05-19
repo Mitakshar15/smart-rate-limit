@@ -1,0 +1,25 @@
+{
+  "properties": [
+    {
+      "name": "rate-limit.storage",
+      "type": "java.lang.String",
+      "description": "Storage type for rate limiting (redis or memory)",
+      "defaultValue": "memory"
+    }
+  ],
+  "hints": [
+    {
+      "name": "rate-limit.storage",
+      "values": [
+        {
+          "value": "memory",
+          "description": "In-memory rate limiting, suitable for single-instance applications."
+        },
+        {
+          "value": "redis",
+          "description": "Redis-based rate limiting, suitable for distributed applications."
+        }
+      ]
+    }
+  ]
+}

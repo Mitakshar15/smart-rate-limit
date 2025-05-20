@@ -8,20 +8,12 @@ import java.security.Principal;
 public class KeyGenerator {
 
     public String generate(HttpServletRequest request, RateLimitScope scope, String endpoint) {
-        String key;
-        switch (scope) {
-            case IP:
-                key = getClientIp(request) + ":" + endpoint;
-                break;
-            case USER:
-                key = getUsername(request) + ":" + endpoint;
-                break;
-            case ENDPOINT:
-                key = endpoint;
-                break;
-            default:
-                throw new IllegalArgumentException("Invalid scope");
-        }
+        String key = switch (scope) {
+            case IP -> getClientIp(request) + ":" + endpoint;
+            case USER -> getUsername(request) + ":" + endpoint;
+            case ENDPOINT -> endpoint;
+            default -> throw new IllegalArgumentException("Invalid scope");
+        };
         System.out.println("Generated rate limit key: " + key);  // Debug log
         return key;
     }

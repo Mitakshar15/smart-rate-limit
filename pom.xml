@@ -10,12 +10,20 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.ratelimit</groupId>
+
+    <groupId>com.github.Mitakshar15</groupId>
     <artifactId>smart-rate-limit</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>smart-rate-limit</name>
     <description>Smart Rate Limiting library for Spring Boot</description>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/Mitakshar15/smart-rate-limit</url>
+        </repository>
+    </distributionManagement>
     <properties>
         <java.version>17</java.version>
     </properties>

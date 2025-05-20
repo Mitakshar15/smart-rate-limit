@@ -5,6 +5,7 @@ import com.ratelimit.config.KeyGenerator;
 import com.ratelimit.service.RateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,9 +21,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final KeyGenerator keyGenerator;
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (handler instanceof HandlerMethod) {
-            HandlerMethod method = (HandlerMethod) handler;
+    public boolean preHandle(@NonNull HttpServletRequest request,@NonNull HttpServletResponse response,@NonNull Object handler) {
+        if (handler instanceof HandlerMethod method) {
             RateLimit rateLimit = method.getMethodAnnotation(RateLimit.class);
             if (rateLimit != null) {
                 String endpoint = request.getRequestURI();

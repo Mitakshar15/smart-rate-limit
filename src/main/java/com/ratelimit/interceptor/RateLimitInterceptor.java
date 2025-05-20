@@ -1,85 +1,41 @@
 package com.ratelimit.interceptor;
 
 import com.ratelimit.annotation.RateLimit;
+import com.ratelimit.config.KeyGenerator;
 import com.ratelimit.service.RateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import java.io.IOException;
-import java.security.Principal;
 
+@RequiredArgsConstructor
 public class RateLimitInterceptor implements HandlerInterceptor {
 
+    private static final Logger log = LoggerFactory.getLogger(RateLimitInterceptor.class);
     private final RateLimiter rateLimiter;
-
-    public RateLimitInterceptor(RateLimiter rateLimiter) {
-        this.rateLimiter = rateLimiter;
-    }
+    private final KeyGenerator keyGenerator;
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
-                             Object handler) throws Exception {
-
-        if (!(handler instanceof HandlerMethod)) {
-            return true;
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (handler instanceof HandlerMethod) {
+            HandlerMethod method = (HandlerMethod) handler;
+            RateLimit rateLimit = method.getMethodAnnotation(RateLimit.class);
+            if (rateLimit != null) {
+                String endpoint = request.getRequestURI();
+                String key = keyGenerator.generate(request, rateLimit.scope(), endpoint);
+                log.debug("Checking rate limit for key: {}", key);
+                boolean allowed = rateLimiter.allowRequest(key, rateLimit.requests(), rateLimit.durationMinutes());
+                if (!allowed) {
+                    log.warn("Rate limit exceeded for key: {}", key);
+                    response.setStatus(429);
+                    return false;
+                }
+            }
         }
-
-        HandlerMethod handlerMethod = (HandlerMethod) handler;
-        RateLimit rateLimitAnnotation = handlerMethod.getMethodAnnotation(RateLimit.class);
-
-        if (rateLimitAnnotation == null) {
-            return true;
-        }
-
-        String key = generateKey(request, rateLimitAnnotation, handlerMethod);
-
-        if (!rateLimiter.tryAcquire(key, rateLimitAnnotation.requests(),
-                rateLimitAnnotation.durationMinutes())) {
-            sendRateLimitExceededResponse(response);
-            return false;
-        }
-
         return true;
-    }
-
-    private String generateKey(HttpServletRequest request, RateLimit annotation,
-                               HandlerMethod handlerMethod) {
-        String prefix = annotation.scope().name().toLowerCase() + ":";
-
-        switch (annotation.scope()) {
-            case IP:
-                return prefix + getClientIp(request);
-            case USER:
-                return prefix + getUserIdentifier(request);
-            case ENDPOINT:
-                return prefix + getEndpointIdentifier(handlerMethod);
-            default:
-                return prefix + getClientIp(request);
-        }
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
-
-    private String getUserIdentifier(HttpServletRequest request) {
-        Principal principal = request.getUserPrincipal();
-        return principal != null ? principal.getName() : getClientIp(request);
-    }
-
-    private String getEndpointIdentifier(HandlerMethod handlerMethod) {
-        return handlerMethod.getBeanType().getName() + "." + handlerMethod.getMethod().getName();
-    }
-
-    private void sendRateLimitExceededResponse(HttpServletResponse response) throws IOException {
-        response.setStatus(429); // Too Many Requests
-        response.setContentType("application/json");
-        response.getWriter().write("{\"status\":429,\"error\":\"Too Many Requests\",\"message\":\"Rate limit exceeded\"}");
     }
 }

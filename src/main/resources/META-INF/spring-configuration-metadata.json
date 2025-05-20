@@ -1,25 +1,22 @@
 {
   "properties": [
     {
-      "name": "rate-limit.storage",
+      "name": "rate-limiter.type",
       "type": "java.lang.String",
-      "description": "Storage type for rate limiting (redis or memory)",
-      "defaultValue": "memory"
-    }
-  ],
-  "hints": [
+      "description": "Rate limiter type (redis/in-memory)",
+      "defaultValue": "in-memory"
+    },
     {
-      "name": "rate-limit.storage",
-      "values": [
-        {
-          "value": "memory",
-          "description": "In-memory rate limiting, suitable for single-instance applications."
-        },
-        {
-          "value": "redis",
-          "description": "Redis-based rate limiting, suitable for distributed applications."
-        }
-      ]
+      "name": "rate-limiter.default-requests",
+      "type": "java.lang.Integer",
+      "description": "Default requests per minute",
+      "defaultValue": 100
+    },
+    {
+      "name": "rate-limiter.default-duration",
+      "type": "java.lang.Integer",
+      "description": "Default duration in minutes",
+      "defaultValue": 1
     }
   ]
 }

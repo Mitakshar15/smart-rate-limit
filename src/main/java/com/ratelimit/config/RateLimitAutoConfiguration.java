@@ -4,54 +4,50 @@ import com.ratelimit.interceptor.RateLimitInterceptor;
 import com.ratelimit.service.InMemoryRateLimiter;
 import com.ratelimit.service.RateLimiter;
 import com.ratelimit.service.RedisRateLimiter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
+@EnableConfigurationProperties(RateLimitProperties.class)
 public class RateLimitAutoConfiguration {
 
-    @Configuration
-    static class RateLimiterConfiguration {
-
-        @Bean
-        @ConditionalOnProperty(name = "rate-limit.storage", havingValue = "redis")
-        @ConditionalOnClass(RedisTemplate.class)
-        public RateLimiter redisRateLimiter(RedisTemplate<String, String> redisTemplate) {
-            return new RedisRateLimiter(redisTemplate);
-        }
-
-        @Bean
-        @ConditionalOnMissingBean(RateLimiter.class)
-        public RateLimiter inMemoryRateLimiter() {
-            return new InMemoryRateLimiter();
-        }
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "rate-limiter.type", havingValue = "redis", matchIfMissing = true)
+    public RateLimiter redisRateLimiter(RedisConnectionFactory factory) {
+        return new RedisRateLimiter(factory);
     }
 
-    @Configuration
-    static class RateLimitInterceptorConfiguration implements WebMvcConfigurer {
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "rate-limiter.type", havingValue = "in-memory")
+    public RateLimiter inMemoryRateLimiter() {
+        return new InMemoryRateLimiter();
+    }
 
-        private final RateLimiter rateLimiter;
+    @Bean
+    public KeyGenerator keyGenerator() {
+        return new KeyGenerator();
+    }
 
-        @Autowired
-        public RateLimitInterceptorConfiguration(RateLimiter rateLimiter) {
-            this.rateLimiter = rateLimiter;
-        }
+    @Bean
+    public RateLimitInterceptor rateLimitInterceptor(RateLimiter rateLimiter, KeyGenerator keyGenerator) {
+        return new RateLimitInterceptor(rateLimiter, keyGenerator);
+    }
 
-        @Bean
-        public RateLimitInterceptor rateLimitInterceptor() {
-            return new RateLimitInterceptor(rateLimiter);
-        }
-
-        @Override
-        public void addInterceptors(InterceptorRegistry registry) {
-            registry.addInterceptor(rateLimitInterceptor());
-        }
+    @Bean
+    public WebMvcConfigurer webMvcConfigurer(RateLimitInterceptor interceptor) {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(interceptor);
+            }
+        };
     }
 }

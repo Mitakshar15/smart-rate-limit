@@ -1,32 +1,38 @@
 package com.ratelimit.service;
 
-
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import java.util.Collections;
+import java.util.List;
 
-import java.util.concurrent.TimeUnit;
-
-@Service
-@ConditionalOnClass(RedisTemplate.class)
 public class RedisRateLimiter implements RateLimiter {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final DefaultRedisScript<Long> rateLimitScript;
 
-    public RedisRateLimiter(RedisTemplate<String, String> redisTemplate) {
-        this.redisTemplate = redisTemplate;
+    public RedisRateLimiter(RedisConnectionFactory connectionFactory) {
+        this.redisTemplate = new RedisTemplate<>();
+        redisTemplate.setConnectionFactory(connectionFactory);
+        redisTemplate.afterPropertiesSet();
+
+        this.rateLimitScript = new DefaultRedisScript<>();
+        rateLimitScript.setScriptText(
+                "local current = redis.call('INCR', KEYS[1])\n" +
+                        "if current == 1 then\n" +
+                        "    redis.call('EXPIRE', KEYS[1], ARGV[1])\n" +
+                        "end\n" +
+                        "return current > tonumber(ARGV[2]) and 0 or 1"
+        );
+        rateLimitScript.setResultType(Long.class);
     }
 
     @Override
-    public boolean tryAcquire(String key, int requests, int durationMinutes) {
-        String counterKey = "rate_limit:" + key;
-
-        Long currentCount = redisTemplate.opsForValue().increment(counterKey);
-
-        if (currentCount != null && currentCount == 1) {
-            redisTemplate.expire(counterKey, durationMinutes, TimeUnit.MINUTES);
-        }
-
-        return currentCount != null && currentCount <= requests;
+    public boolean allowRequest(String key, int requests, int durationMinutes) {
+        List<String> keys = Collections.singletonList(key);
+        String expiration = String.valueOf(durationMinutes * 60);
+        String maxRequests = String.valueOf(requests);
+        Long result = redisTemplate.execute(rateLimitScript, keys, expiration, maxRequests);
+        return result == 1;
     }
 }

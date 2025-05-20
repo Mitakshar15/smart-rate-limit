@@ -1,52 +1,37 @@
 package com.ratelimit.service;
 
-
-import org.springframework.stereotype.Service;
-
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentMap;
 
-@Service
 public class InMemoryRateLimiter implements RateLimiter {
 
-    private final Map<String, RateLimit> limiters = new ConcurrentHashMap<>();
+    private static class Bucket {
+        int count;
+        long expiresAt;
 
-    @Override
-    public boolean tryAcquire(String key, int requests, int durationMinutes) {
-        RateLimit rateLimit = limiters.compute(key, (k, v) -> {
-            if (v == null || v.isExpired()) {
-                return new RateLimit(requests, durationMinutes);
-            }
-            return v;
-        });
-
-        return rateLimit.tryAcquire();
+        Bucket(int count, long expiresAt) {
+            this.count = count;
+            this.expiresAt = expiresAt;
+        }
     }
 
-    private static class RateLimit {
-        private final int maxRequests;
-        private final AtomicInteger currentRequests;
-        private final long resetTimeMillis;
+    private final ConcurrentMap<String, Bucket> storage = new ConcurrentHashMap<>();
 
-        public RateLimit(int requests, int durationMinutes) {
-            this.maxRequests = requests;
-            this.currentRequests = new AtomicInteger(0);
-            this.resetTimeMillis = System.currentTimeMillis() + ((long) durationMinutes * 60 * 1000);
-        }
+    @Override
+    public boolean allowRequest(String key, int requests, int durationMinutes) {
+        long now = System.currentTimeMillis();
+        long windowMillis = durationMinutes * 60 * 1000L;
 
-        public boolean tryAcquire() {
-            if (isExpired()) {
-                currentRequests.set(0);
-                return true;
+        // Capture the result of compute()
+        Bucket bucket = storage.compute(key, (k, existingBucket) -> {
+            if (existingBucket == null || now >= existingBucket.expiresAt) {
+                return new Bucket(1, now + windowMillis);
+            } else {
+                existingBucket.count++;
+                return existingBucket;
             }
+        });
 
-            int count = currentRequests.incrementAndGet();
-            return count <= maxRequests;
-        }
-
-        public boolean isExpired() {
-            return System.currentTimeMillis() > resetTimeMillis;
-        }
+        return bucket.count <= requests;  // Use the computed bucket directly
     }
 }

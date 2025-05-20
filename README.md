@@ -27,11 +27,11 @@ Smart Rate Limit is a Spring Boot library that provides annotation-based rate li
 Add the following dependency to your Maven `pom.xml`:
 
 ```xml
-<dependency>
-    <groupId>com.ratelimit</groupId>
-    <artifactId>smart-rate-limit</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-</dependency>
+        <dependency>
+            <groupId>com.github.Mitakshar15</groupId>
+            <artifactId>smart-rate-limit</artifactId>
+            <version>1.0.0</version>
+        </dependency>
 ```
 
 ## Quick Start
